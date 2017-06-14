@@ -26,9 +26,10 @@ import time
 from lxml import etree
 import configparser
 
+current_dir = os.path.dirname(os.path.realpath(__file__))
 # Change the following paths as appropriate on your system
-config_file = "rbsync.cfg"
-secrets_file = "secrets.yaml"
+config_file = current_dir + "/rbsync.cfg"
+secrets_file = current_dir + "/secrets.yaml"
 rhythmdb_default = expanduser('~/.local/share/rhythmbox/rhythmdb.xml')
 
 debug = False
