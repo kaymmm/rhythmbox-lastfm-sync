@@ -32,7 +32,7 @@ config_file = current_dir + "/rbsync.cfg"
 secrets_file = current_dir + "/secrets.yaml"
 rhythmdb_default = expanduser('~/.local/share/rhythmbox/rhythmdb.xml')
 
-debug = True
+debug = False
 
 
 class SyncRB():
@@ -133,21 +133,30 @@ class SyncRB():
         return recent_tracks
 
     def xpath_escape(self, s):
-        return s.replace("'", "&apos;").replace('"', "&quot;")
+        return s.replace('"', '&quot;')
 
     def match_scrobbles(self, tracklist):
         for c, track in enumerate(tracklist, 1):
-            artist = self.xpath_escape(str(track.track.artist))
-            title = self.xpath_escape(str(track.track.title))
-            album = self.xpath_escape(str(track.album))
+            artist = str(track.track.artist)
+            title = str(track.track.title)
+            album = str(track.album)
+            xp_artist = self.xpath_escape(artist.lower()) \
+                if artist is not None else ""
+            xp_title = self.xpath_escape(title.lower()) \
+                if title is not None else ""
+            xp_album = self.xpath_escape(album.lower()) \
+                if album is not None else ""
             timestamp = track.timestamp
             if debug:
                 print(str(artist) + ' - ' + title +
                       ' {' + album + '} @ ' + timestamp)
-            xpath_query = '//entry[@type="song"]/title[lower(text())="' \
-                + title.lower() + '"]/../artist[lower(text())="' \
-                + artist.lower() + '"]/../album[lower(text())="' \
-                + album.lower() + '"]/..'
+            xpath_query = '//entry[@type="song"]'
+            if title is not None:
+                xpath_query += '/title[lower(text())="%s"]/..' % (xp_title)
+            if artist is not None:
+                xpath_query += '/artist[lower(text())="%s"]/..' % (xp_artist)
+            if album is not None:
+                xpath_query += '/album[lower(text())="%s"]/..' % (xp_album)
             matches = self.db_root.xpath(
                     xpath_query,
                     extensions={(None, 'lower'): (lambda c, a: a[0].lower())})
