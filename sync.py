@@ -25,6 +25,7 @@ from os.path import expanduser
 import time
 from lxml import etree
 import configparser
+from xml.sax.saxutils import escape
 
 current_dir = os.path.dirname(os.path.realpath(__file__))
 # Change the following paths as appropriate on your system
@@ -133,30 +134,29 @@ class SyncRB():
         return recent_tracks
 
     def xpath_escape(self, s):
-        return s.replace('"', '&quot;')
+        return escape(s).replace('"', '&quot;')
 
     def match_scrobbles(self, tracklist):
         for c, track in enumerate(tracklist, 1):
             artist = str(track.track.artist)
             title = str(track.track.title)
             album = str(track.album)
-            xp_artist = self.xpath_escape(artist.lower()) \
-                if artist is not None else ""
-            xp_title = self.xpath_escape(title.lower()) \
-                if title is not None else ""
-            xp_album = self.xpath_escape(album.lower()) \
-                if album is not None else ""
+            xp_artist = self.xpath_escape(artist.lower())
+            xp_title = self.xpath_escape(title.lower())
+            xp_album = self.xpath_escape(album.lower())
             timestamp = track.timestamp
             if debug:
-                print(str(artist) + ' - ' + title +
-                      ' {' + album + '} @ ' + timestamp)
+                print(str(xp_artist) + ' - ' + xp_title +
+                      ' {' + xp_album + '} @ ' + timestamp)
             xpath_query = '//entry[@type="song"]'
-            if title is not None:
+            if xp_title is not None:
                 xpath_query += '/title[lower(text())="%s"]/..' % (xp_title)
-            if artist is not None:
+            if xp_artist is not None:
                 xpath_query += '/artist[lower(text())="%s"]/..' % (xp_artist)
-            if album is not None:
+            if xp_album is not None:
                 xpath_query += '/album[lower(text())="%s"]/..' % (xp_album)
+            if debug:
+                print('query: ' + xpath_query)
             matches = self.db_root.xpath(
                     xpath_query,
                     extensions={(None, 'lower'): (lambda c, a: a[0].lower())})
@@ -179,6 +179,10 @@ class SyncRB():
                     el_temp.text = timestamp
                     if lastplayed < int(timestamp):
                         matches[0].replace(el_lastplayed, el_temp)
+                        # if debug:
+                        #     print('\033[92m' + '- ' + '\033[00m' + timestamp)
+                        #     print('\033[92m' + '- ' + '\033[00m' +
+                        #           matches[0].find('last-played').text)
                 else:
                     el_temp.text = timestamp
                     matches[0].append(el_temp)
