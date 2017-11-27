@@ -29,8 +29,8 @@ from xml.sax.saxutils import escape
 
 current_dir = os.path.dirname(os.path.realpath(__file__))
 # Change the following paths as appropriate on your system
-config_file = current_dir + "/rbsync.cfg"
-secrets_file = current_dir + "/secrets.yaml"
+config_file = current_dir + '/rbsync.cfg'
+secrets_file = current_dir + '/secrets.yaml'
 rhythmdb_default = expanduser('~/.local/share/rhythmbox/rhythmdb.xml')
 
 debug = False
@@ -70,30 +70,30 @@ class SyncRB():
         import tzlocal  # pip install tzlocal
         return datetime.fromtimestamp(
                 float(strtimestamp),
-                tzlocal.get_localzone()).strftime("%Y-%m-%d %H:%M:%S (%Z)")
+                tzlocal.get_localzone()).strftime('%Y-%m-%d %H:%M:%S (%Z)')
 
     def load_secrets(self, secrets_file):
         if os.path.isfile(secrets_file):
             import yaml  # pip install pyyaml
-            with open(secrets_file, "r") as f:  # see example_test_pylast.yaml
+            with open(secrets_file, 'r') as f:  # see example_test_pylast.yaml
                 self.secrets = yaml.load(f)
             if debug:
-                print("Loaded secrets from secrets.yaml")
+                print('Loaded secrets from secrets.yaml')
         else:
             self.secrets = {}
             try:
-                self.secrets["username"] = \
+                self.secrets['username'] = \
                     os.environ['PYLAST_USERNAME'].strip()
-                self.secrets["password_hash"] = \
+                self.secrets['password_hash'] = \
                     os.environ['PYLAST_PASSWORD_HASH'].strip()
                 #  password_hash = pylast.md5('password')
-                self.secrets["api_key"] = os.environ['PYLAST_API_KEY'].strip()
-                self.secrets["api_secret"] = \
+                self.secrets['api_key'] = os.environ['PYLAST_API_KEY'].strip()
+                self.secrets['api_secret'] = \
                     os.environ['PYLAST_API_SECRET'].strip()
                 if debug:
-                    print("Loaded secrets from environment variables")
+                    print('Loaded secrets from environment variables')
             except KeyError:
-                print("Missing environment variables: PYLAST_USERNAME etc.")
+                print('Missing environment variables: PYLAST_USERNAME etc.')
 
     def load_config(self, config_file):
         config = configparser.ConfigParser()
@@ -101,17 +101,17 @@ class SyncRB():
         if os.path.isfile(config_file):
             config.read_file(open(config_file))
             self.config['last_update'] = config['Sync']['last_update'] \
-                if 'last_update' in config['Sync'] else "0"
+                if 'last_update' in config['Sync'] else '0'
             self.config['limit'] = config['Sync']['limit'] \
-                if 'limit' in config['Sync'] else "500"
+                if 'limit' in config['Sync'] else '500'
             self.config['rhythmdb'] = config['Sync']['rhythmdb'] \
                 if 'rhythmdb' in config['Sync'] \
                 else rhythmdb_default
         else:
             self.config['last_update'] = '0'
-            self.config['limit'] = 500
+            self.config['limit'] = '500'
             self.config['rhythmdb'] = rhythmdb_default
-        print("Updating with scrobbles since ",
+        print('Updating with scrobbles since ',
               self.local_timestamp(self.config['last_update']))
 
     def save_config(self, config_file):
@@ -124,7 +124,7 @@ class SyncRB():
             with open(config_file, 'w') as configfile:
                 config.write(configfile)
             if debug:
-                print("Updated configuration file")
+                print('Updated configuration file')
 
     def get_recent_tracks(self):
         recent_tracks = self.network.get_user(self.username).get_recent_tracks(
@@ -168,7 +168,7 @@ class SyncRB():
                     el_temp.text = str(int(el_playcount.text) + 1)
                     matches[0].replace(el_playcount, el_temp)
                 else:
-                    el_temp.text = "1"
+                    el_temp.text = '1'
                     matches[0].append(el_temp)
                 playcount = el_temp.text
 
