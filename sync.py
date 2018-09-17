@@ -77,23 +77,38 @@ class SyncRB():
             import yaml  # pip install pyyaml
             with open(secrets_file, 'r') as f:  # see example_test_pylast.yaml
                 self.secrets = yaml.load(f)
-            if debug:
-                print('Loaded secrets from secrets.yaml')
+                if not self.secrets:
+                    if debug:
+                        print('secrets.yaml does not contain necessary variables')
+                    self.create_secrets(secrets_file)
+                else:
+                    if debug:
+                        print('secrets.yaml loaded')
         else:
-            self.secrets = {}
-            try:
-                self.secrets['username'] = \
-                    os.environ['PYLAST_USERNAME'].strip()
-                self.secrets['password_hash'] = \
-                    os.environ['PYLAST_PASSWORD_HASH'].strip()
-                #  password_hash = pylast.md5('password')
-                self.secrets['api_key'] = os.environ['PYLAST_API_KEY'].strip()
-                self.secrets['api_secret'] = \
-                    os.environ['PYLAST_API_SECRET'].strip()
-                if debug:
-                    print('Loaded secrets from environment variables')
-            except KeyError:
-                print('Missing environment variables: PYLAST_USERNAME etc.')
+            self.create_secrets(secrets_file)
+
+    def create_secrets(self, secrets_file):
+        import yaml  # pip install pyyaml
+        from getpass import getpass
+        self.secrets = {}
+        try:
+            self.secrets['username'] = \
+                input("Enter LastFM username: ").strip()
+            self.secrets['password_hash'] = \
+                pylast.md5(getpass(prompt='Enter LastFM password: ').strip())
+            self.secrets['api_key'] = \
+                input("Enter LastFM API Key: ").strip()
+            self.secrets['api_secret'] = \
+                getpass(prompt='Enter LastFM API Secret: ').strip()
+            if debug:
+                from pprint import pprint
+                pprint(self.secrets)
+            with open(secrets_file, 'w+') as f:
+                yaml.dump(self.secrets, f, default_flow_style=False)
+            if debug:
+                print('Added secrets to secrets.yaml')
+        except Exception as err:
+            print('There was an error saving the secrets.yaml file: %s' % Exception)
 
     def load_config(self, config_file, database_file):
         config = configparser.ConfigParser()
