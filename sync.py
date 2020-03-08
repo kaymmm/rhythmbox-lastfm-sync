@@ -76,7 +76,7 @@ class SyncRB():
         if os.path.isfile(secrets_file):
             import yaml  # pip install pyyaml
             with open(secrets_file, 'r') as f:  # see example_test_pylast.yaml
-                self.secrets = yaml.load(f, Loader-yaml.SafeLoader)
+                self.secrets = yaml.load(f, Loader=yaml.SafeLoader)
                 if not self.secrets:
                     if debug:
                         print('secrets.yaml does not contain necessary variables')
