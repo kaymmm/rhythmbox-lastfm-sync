@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-Copyright 2017 Keith Miyake
+Copyright 2017-2020 Keith Miyake
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -25,14 +25,12 @@ from os.path import expanduser
 import time
 from lxml import etree
 import configparser
-# from xml.sax.saxutils import escape
 
 current_dir = os.path.dirname(os.path.realpath(__file__))
 # Change the following paths as appropriate on your system
 config_file_default = current_dir + '/rbsync.cfg'
 secrets_file_default = current_dir + '/secrets.yaml'
 rhythmdb_default = expanduser('~/.local/share/rhythmbox/rhythmdb.xml')
-recents_test_file = current_dir + '/recents_test.txt'
 
 debug = False
 
@@ -54,9 +52,6 @@ class SyncRB():
 
         self.username = self.secrets['username']
         self.password_hash = self.secrets['password_hash']
-
-        self.API_KEY = self.secrets['api_key']
-        self.API_SECRET = self.secrets['api_secret']
 
         self.last_update = self.config['last_update']
         self.timestamp = str(int(time.time()))
@@ -93,13 +88,9 @@ class SyncRB():
         self.secrets = {}
         try:
             self.secrets['username'] = \
-                input("Enter LastFM username: ").strip()
+                input("Enter Libre.fm username: ").strip()
             self.secrets['password_hash'] = \
-                pylast.md5(getpass(prompt='Enter LastFM password: ').strip())
-            self.secrets['api_key'] = \
-                input("Enter LastFM API Key: ").strip()
-            self.secrets['api_secret'] = \
-                getpass(prompt='Enter LastFM API Secret: ').strip()
+                pylast.md5(getpass(prompt='Enter Libre.fm password: ').strip())
             if debug:
                 from pprint import pprint
                 pprint(self.secrets)
@@ -144,9 +135,8 @@ class SyncRB():
             if debug:
                 print('Updated configuration file')
 
-    def load_lastfm_network(self):
-        self.network = pylast.LastFMNetwork(
-            api_key=self.API_KEY, api_secret=self.API_SECRET,
+    def load_librefm_network(self):
+        self.network = pylast.LibreFMNetwork(
             username=self.username, password_hash=self.password_hash)
         return 1
 
@@ -158,9 +148,6 @@ class SyncRB():
                 'title': str(track.track.title),
                 'album': str(track.album),
                 'timestamp': track.timestamp})
-        # if debug:
-        #     print('Saving recent track list to ' + recents_test_file)
-        #     self.dump_recent_tracks(return_list)
         return return_list
 
     def get_recent_tracks(self):
@@ -169,20 +156,6 @@ class SyncRB():
                 time_from=self.config['last_update'],
                 time_to=self.timestamp)
         return self.pylast_to_dict(recent_tracks)
-
-    def dump_recent_tracks(self, recents):
-        import json
-        with open(recents_test_file, 'w') as f:
-            json.dump(recents, f, indent=2)
-
-    def read_recent_tracks(self):
-        import ast
-        ret_val = None
-        if os.path.isfile(recents_test_file):
-            with open(recents_test_file, 'r') as f:
-                g = f.read()
-            ret_val = ast.literal_eval(g)
-        return ret_val
 
     def xpath_escape(self, s):
         # x = escape(s)
@@ -255,7 +228,7 @@ class SyncRB():
 if __name__ == '__main__':
     sync = SyncRB(secrets_file=secrets_file_default,
                   config_file=config_file_default)
-    sync.load_lastfm_network()
+    sync.load_librefm_network()
 
     recents = sync.get_recent_tracks()
     if sync.match_scrobbles(recents) > 0:
