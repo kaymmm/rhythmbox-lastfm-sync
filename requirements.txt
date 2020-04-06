@@ -1,4 +1,4 @@
 lxml==3.8.0
 pylast==1.8.0
 tzlocal==1.4
-PyYAML==3.12
+PyYAML==5.1
