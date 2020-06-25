@@ -21,19 +21,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import pylast
 import shutil
 import os
-from os.path import expanduser
 import time
 from lxml import etree
 import configparser
+import logging
 
-current_dir = os.path.dirname(os.path.realpath(__file__))
 # Change the following paths as appropriate on your system
-config_file_default = current_dir + '/rbsync.cfg'
-secrets_file_default = current_dir + '/secrets.yaml'
-rhythmdb_default = expanduser('~/.local/share/rhythmbox/rhythmdb.xml')
+PYLAST_CONFIG_DIR = os.path.join(os.path.expanduser('~'), '.config', 'pylast')
+RHYTHMBOX_DB = os.path.expanduser('~/.local/share/rhythmbox/rhythmdb.xml')
+CONFIG_FILE = os.path.join(PYLAST_CONFIG_DIR, 'rbsync.cfg')
+SECRETS_FILE = os.path.join(PYLAST_CONFIG_DIR, 'secrets.yaml')
 
-debug = False
-
+logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.INFO)
 
 class SyncRB():
 
@@ -41,8 +40,8 @@ class SyncRB():
     config = None
 
     def __init__(self,
-                 secrets_file=secrets_file_default,
-                 config_file=config_file_default,
+                 secrets_file=SECRETS_FILE,
+                 config_file=CONFIG_FILE,
                  database_file=rhythmdb_default):
         if self.secrets is None:
             self.load_secrets(secrets_file)
@@ -50,8 +49,8 @@ class SyncRB():
         if self.config is None:
             self.load_config(config_file, database_file)
 
-        self.username = self.secrets['username']
-        self.password_hash = self.secrets['password_hash']
+        self.username = self.secrets['libre_username']
+        self.password_hash = self.secrets['libre_password_hash']
 
         self.last_update = self.config['last_update']
         self.timestamp = str(int(time.time()))
@@ -62,24 +61,23 @@ class SyncRB():
 
     def local_timestamp(self, strtimestamp):
         from datetime import datetime
-        import tzlocal  # pip install tzlocal
+        import tzlocal
         return datetime.fromtimestamp(
                 float(strtimestamp),
                 tzlocal.get_localzone()).strftime('%Y-%m-%d %H:%M:%S (%Z)')
 
     def load_secrets(self, secrets_file):
         if os.path.isfile(secrets_file):
-            import yaml  # pip install pyyaml
+            import yaml
             with open(secrets_file, 'r') as f:  # see example_test_pylast.yaml
                 self.secrets = yaml.load(f, Loader=yaml.SafeLoader)
                 if not self.secrets:
-                    if debug:
-                        print('secrets.yaml does not contain necessary variables')
+                    logging.warn('secrets.yaml could not be loaded; creating new file.')
                     self.create_secrets(secrets_file)
                 else:
-                    if debug:
-                        print('secrets.yaml loaded')
+                    logging.debug('secrets.yaml loaded')
         else:
+            logging.info('Login information does not exist. Please enter your Libre.fm login info.')
             self.create_secrets(secrets_file)
 
     def create_secrets(self, secrets_file):
@@ -91,15 +89,11 @@ class SyncRB():
                 input("Enter Libre.fm username: ").strip()
             self.secrets['password_hash'] = \
                 pylast.md5(getpass(prompt='Enter Libre.fm password: ').strip())
-            if debug:
-                from pprint import pprint
-                pprint(self.secrets)
             with open(secrets_file, 'w+') as f:
                 yaml.dump(self.secrets, f, default_flow_style=False)
-            if debug:
-                print('Added secrets to secrets.yaml')
+            logging.debug('Saved secrets to secrets.yaml')
         except Exception as err:
-            print('There was an error saving the secrets.yaml file: %s' % Exception)
+            logging.error('There was an error saving the secrets: {0}'.format(err))
 
     def load_config(self, config_file, database_file):
         config = configparser.ConfigParser()
@@ -120,8 +114,8 @@ class SyncRB():
             self.config['last_update'] = '0'
             self.config['limit'] = '500'
             self.config['rhythmdb'] = rhythmdb_default
-        print('Updating with scrobbles since ',
-              self.local_timestamp(self.config['last_update']))
+        logging.info('Updating with scrobbles since {0}'.format(
+              self.local_timestamp(self.config['last_update'])))
 
     def save_config(self, config_file):
         if self.config is not None:
@@ -132,8 +126,7 @@ class SyncRB():
             config['Sync']['rhythmdb'] = self.config['rhythmdb']
             with open(config_file, 'w') as configfile:
                 config.write(configfile)
-            if debug:
-                print('Updated configuration file')
+            logging.debug('Updated configuration file')
 
     def load_librefm_network(self):
         self.network = pylast.LibreFMNetwork(
@@ -176,8 +169,7 @@ class SyncRB():
         matches = self.db_root.xpath(
             xp_query,
             extensions={(None, 'lower'): (lambda c, a: a[0].lower())})
-        if debug:
-            print('\n->Query: ' + xp_query)
+        logging.debug('\n->Query: ' + xp_query)
         return matches
 
     def match_scrobbles(self, tracklist):
@@ -211,11 +203,11 @@ class SyncRB():
                     el_temp.text = timestamp
                     matches[0].append(el_temp)
                 num_matches += 1
-                print('\033[92m' + '✓ ' + '\033[00m' + track['artist']
+                logging.info('\033[92m' + '✓ ' + '\033[00m' + track['artist']
                       + ' - ' + track['album'] + ' - ' + track['title']
                       + ' {{' + playcount + '}}')
             else:
-                print('\033[91m' + 'x ' + '\033[00m' + track['artist'] + ' - '
+                logging.info('\033[91m' + 'x ' + '\033[00m' + track['artist'] + ' - '
                       + track['album'] + ' - ' + track['title'])
         return num_matches
 
@@ -226,11 +218,11 @@ class SyncRB():
 
 
 if __name__ == '__main__':
-    sync = SyncRB(secrets_file=secrets_file_default,
-                  config_file=config_file_default)
+    sync = SyncRB(secrets_file=SECRETS_FILE,
+                  config_file=CONFIG_FILE)
     sync.load_librefm_network()
 
     recents = sync.get_recent_tracks()
     if sync.match_scrobbles(recents) > 0:
         sync.write_db()
-    sync.save_config(config_file_default)
+    sync.save_config(CONFIG_FILE)
