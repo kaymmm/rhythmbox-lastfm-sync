@@ -115,7 +115,7 @@ class SyncRB():
         if self.config is not None:
             config = configparser.ConfigParser()
             config['Sync'] = {}
-            config['Sync']['last_update'] = self.config['last_update']
+            config['Sync']['last_update'] = int(datetime.timestamp(datetime.now()))
             config['Sync']['limit'] = self.config['limit']
             config['Sync']['rhythmdb'] = self.config['rhythmdb']
             with open(config_file, 'w') as configfile:
