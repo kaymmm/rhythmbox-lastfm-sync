@@ -21,7 +21,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import pylast
 import shutil
 import os
-import time
 from lxml import etree
 import configparser
 import logging
@@ -31,6 +30,7 @@ PYLAST_CONFIG_DIR = os.path.join(os.path.expanduser('~'), '.config', 'pylast')
 RHYTHMBOX_DB = os.path.expanduser('~/.local/share/rhythmbox/rhythmdb.xml')
 CONFIG_FILE = os.path.join(PYLAST_CONFIG_DIR, 'rbsync.cfg')
 SECRETS_FILE = os.path.join(PYLAST_CONFIG_DIR, 'secrets.yaml')
+LIBREFM_SESSION_KEY_FILE = os.path.join(PYLAST_CONFIG_DIR, "session_key.librefm")
 
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.INFO)
 
@@ -49,12 +49,6 @@ class SyncRB():
         if self.config is None:
             self.load_config(config_file, database_file)
 
-        self.username = self.secrets['libre_username']
-        self.password_hash = self.secrets['libre_password_hash']
-
-        self.last_update = self.config['last_update']
-        self.timestamp = str(int(time.time()))
-
         if os.path.isfile(self.config['rhythmdb']):
             self.db = etree.parse(self.config['rhythmdb'])
             self.db_root = self.db.getroot()
@@ -72,7 +66,7 @@ class SyncRB():
             with open(secrets_file, 'r') as f:  # see example_test_pylast.yaml
                 self.secrets = yaml.load(f, Loader=yaml.SafeLoader)
                 if not self.secrets:
-                    logging.warn('secrets.yaml could not be loaded; creating new file.')
+                    logging.warning('secrets.yaml could not be loaded; creating new file.')
                     self.create_secrets(secrets_file)
                 else:
                     logging.debug('secrets.yaml loaded')
@@ -85,9 +79,9 @@ class SyncRB():
         from getpass import getpass
         self.secrets = {}
         try:
-            self.secrets['username'] = \
+            self.secrets['libre_username'] = \
                 input("Enter Libre.fm username: ").strip()
-            self.secrets['password_hash'] = \
+            self.secrets['libre_password_hash'] = \
                 pylast.md5(getpass(prompt='Enter Libre.fm password: ').strip())
             with open(secrets_file, 'w+') as f:
                 yaml.dump(self.secrets, f, default_flow_style=False)
@@ -114,14 +108,14 @@ class SyncRB():
             self.config['last_update'] = '0'
             self.config['limit'] = '500'
             self.config['rhythmdb'] = RHYTHMBOX_DB
-        logging.info('Updating with scrobbles since {0}'.format(
+        logging.info('Last successful sync was {0}'.format(
               self.local_timestamp(self.config['last_update'])))
 
     def save_config(self, config_file):
         if self.config is not None:
             config = configparser.ConfigParser()
             config['Sync'] = {}
-            config['Sync']['last_update'] = self.timestamp
+            config['Sync']['last_update'] = self.config['last_update']
             config['Sync']['limit'] = self.config['limit']
             config['Sync']['rhythmdb'] = self.config['rhythmdb']
             with open(config_file, 'w') as configfile:
@@ -129,9 +123,41 @@ class SyncRB():
             logging.debug('Updated configuration file')
 
     def load_librefm_network(self):
-        self.network = pylast.LibreFMNetwork(
-            username=self.username, password_hash=self.password_hash)
-        return 1
+        try:
+            self.network = pylast.LibreFMNetwork(
+                username=self.secrets['libre_username'],
+                password_hash=self.secrets['libre_password_hash'])
+            self.network.enable_rate_limit()
+            self.libre_session(LIBREFM_SESSION_KEY_FILE)
+            return 1
+        except (pylast.NetworkError, pylast.MalformedResponseError) as e:
+            logging.error('Could not connect to Libre.fm: {0}'.format(e))
+            return 0
+
+    def libre_session(self, key_file):
+        if not os.path.exists(key_file):
+            skg = pylast.SessionKeyGenerator(self.network)
+            url = skg.get_web_auth_url()
+
+            print(
+                "Please authorize the scrobbler "
+                "to scrobble to your account: %s\n" % url)
+            import webbrowser
+            webbrowser.open(url)
+
+            while True:
+                try:
+                    session_key = skg.get_web_auth_session_key(url)
+                    fp = open(key_file, "w")
+                    fp.write(session_key)
+                    fp.close()
+                    break
+                except pylast.WSError:
+                    import time
+                    time.sleep(1)
+        else:
+            session_key = open(key_file).read()
+        self.network.session_key = session_key
 
     def pylast_to_dict(self, track_list):
         return_list = []
@@ -139,16 +165,56 @@ class SyncRB():
             return_list.insert(0, {
                 'artist': str(track.track.artist),
                 'title': str(track.track.title),
-                'album': str(track.album),
-                'timestamp': track.timestamp})
+                'timestamp': track.timestamp,
+                'album': str(track.album)})
         return return_list
 
     def get_recent_tracks(self):
-        recent_tracks = self.network.get_user(self.username).get_recent_tracks(
-                limit=int(self.config['limit']),
-                time_from=self.config['last_update'],
-                time_to=self.timestamp)
-        return self.pylast_to_dict(recent_tracks)
+        from datetime import datetime
+        all_recents = []
+        num_tracks = 1
+        limit = int(self.config['limit'])
+        time_start = int(self.config['last_update'])
+        time_end = datetime.timestamp(datetime.now())
+        while num_tracks > 0 and time_start < time_end:
+            try:
+                logging.debug(
+                    'Pulling tracks starting at {0} and ending at {1} ({2} - {3})'
+                    .format(
+                            # limit,
+                            datetime.fromtimestamp(time_start),
+                            datetime.fromtimestamp(time_end),
+                            time_start,
+                            time_end
+                    )
+                )
+                recents = self.network.get_user(
+                    self.secrets['libre_username']).get_recent_tracks(
+                        # limit=limit,
+                        time_from=time_start,
+                        time_to=time_end
+                    )
+            except (pylast.NetworkError, pylast.MalformedResponseError, pylast.WSError) as e:
+                logging.error(
+                        'Could not get recent tracks from Last.fm: {0}'
+                        .format(e))
+                break
+
+            recents_clean = self.pylast_to_dict(recents)
+
+            num_tracks = len(recents)
+            if num_tracks > 0:
+                all_recents.extend(recents_clean)
+                time_end = int(min([x['timestamp'] for x in recents_clean])) - 1
+
+            logging.info(
+                    'Retrieved {0} tracks.'
+                    .format(
+                            len(recents),
+                            time_end
+                    )
+            )
+        return all_recents
 
     def xpath_escape(self, s):
         # x = escape(s)
@@ -212,7 +278,7 @@ class SyncRB():
         return num_matches
 
     def write_db(self):
-        rhythmdb_backup = self.config['rhythmdb'] + '.backup-' + self.timestamp
+        rhythmdb_backup = self.config['rhythmdb'] + '.backup-' + self.config['last_update']
         shutil.copy2(self.config['rhythmdb'], rhythmdb_backup)
         self.db.write(self.config['rhythmdb'])
 
