@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import pylast
 import shutil
 import os
+from datetime import datetime
 from lxml import etree
 import configparser
 import logging
@@ -54,7 +55,6 @@ class SyncRB():
             self.db_root = self.db.getroot()
 
     def local_timestamp(self, strtimestamp):
-        from datetime import datetime
         import tzlocal
         return datetime.fromtimestamp(
                 float(strtimestamp),
@@ -170,7 +170,6 @@ class SyncRB():
         return return_list
 
     def get_recent_tracks(self):
-        from datetime import datetime
         all_recents = []
         num_tracks = 1
         limit = int(self.config['limit'])
