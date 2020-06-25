@@ -42,7 +42,7 @@ class SyncRB():
     def __init__(self,
                  secrets_file=SECRETS_FILE,
                  config_file=CONFIG_FILE,
-                 database_file=rhythmdb_default):
+                 database_file=RHYTHMBOX_DB):
         if self.secrets is None:
             self.load_secrets(secrets_file)
 
@@ -109,11 +109,11 @@ class SyncRB():
                     if 'rhythmdb' in config['Sync'] \
                     else database_file
             else:
-                self.config['rhythmdb'] = rhythmdb_default
+                self.config['rhythmdb'] = RHYTHMBOX_DB
         else:
             self.config['last_update'] = '0'
             self.config['limit'] = '500'
-            self.config['rhythmdb'] = rhythmdb_default
+            self.config['rhythmdb'] = RHYTHMBOX_DB
         logging.info('Updating with scrobbles since {0}'.format(
               self.local_timestamp(self.config['last_update'])))
 
