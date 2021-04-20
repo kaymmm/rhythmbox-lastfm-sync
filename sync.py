@@ -31,7 +31,7 @@ PYLAST_CONFIG_DIR = os.path.join(os.path.expanduser('~'), '.config', 'pylast')
 RHYTHMBOX_DB = os.path.expanduser('~/.local/share/rhythmbox/rhythmdb.xml')
 CONFIG_FILE = os.path.join(PYLAST_CONFIG_DIR, 'rbsync.cfg')
 SECRETS_FILE = os.path.join(PYLAST_CONFIG_DIR, 'secrets.yaml')
-LIBREFM_SESSION_KEY_FILE = os.path.join(PYLAST_CONFIG_DIR, "session_key.librefm")
+# LIBREFM_SESSION_KEY_FILE = os.path.join(PYLAST_CONFIG_DIR, "session_key.librefm")
 
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.INFO)
 
@@ -71,7 +71,7 @@ class SyncRB():
                 else:
                     logging.debug('secrets.yaml loaded')
         else:
-            logging.info('Login information does not exist. Please enter your Libre.fm login info.')
+            logging.info('Login information does not exist. Please enter your Last.fm login info.')
             self.create_secrets(secrets_file)
 
     def create_secrets(self, secrets_file):
@@ -79,10 +79,14 @@ class SyncRB():
         from getpass import getpass
         self.secrets = {}
         try:
-            self.secrets['libre_username'] = \
-                input("Enter Libre.fm username: ").strip()
-            self.secrets['libre_password_hash'] = \
-                pylast.md5(getpass(prompt='Enter Libre.fm password: ').strip())
+            self.secrets['last_username'] = \
+                input("Enter last.fm username: ").strip()
+            self.secrets['last_password_hash'] = \
+                pylast.md5(getpass(prompt='Enter last.fm password: ').strip())
+            self.secrets['last_api_key'] = \
+                input("Enter last.fm api key: ").strip()
+            self.secrets['last_api_secret'] = \
+                input("Enter last.fm api secret: ").strip()
             with open(secrets_file, 'w+') as f:
                 yaml.dump(self.secrets, f, default_flow_style=False)
             logging.debug('Saved secrets to secrets.yaml')
@@ -122,19 +126,21 @@ class SyncRB():
                 config.write(configfile)
             logging.debug('Updated configuration file')
 
-    def load_librefm_network(self):
+    def load_lastfm_network(self):
         try:
-            self.network = pylast.LibreFMNetwork(
-                username=self.secrets['libre_username'],
-                password_hash=self.secrets['libre_password_hash'])
+            self.network = pylast.LastFMNetwork(
+                api_key=self.secrets['last_api_key'],
+                api_secret=self.secrets['last_api_secret'],
+                username=self.secrets['last_username'],
+                password_hash=self.secrets['last_password_hash'])
             self.network.enable_rate_limit()
-            self.libre_session(LIBREFM_SESSION_KEY_FILE)
+            # self.libre_session(LIBREFM_SESSION_KEY_FILE)
             return 1
         except (pylast.NetworkError, pylast.MalformedResponseError) as e:
-            logging.error('Could not connect to Libre.fm: {0}'.format(e))
+            logging.error('Could not connect to last.fm: {0}'.format(e))
             return 0
 
-    def libre_session(self, key_file):
+    def last_session(self, key_file):
         if not os.path.exists(key_file):
             skg = pylast.SessionKeyGenerator(self.network)
             url = skg.get_web_auth_url()
@@ -188,7 +194,7 @@ class SyncRB():
                     )
                 )
                 recents = self.network.get_user(
-                    self.secrets['libre_username']).get_recent_tracks(
+                    self.secrets['last_username']).get_recent_tracks(
                         # limit=limit,
                         time_from=time_start,
                         time_to=time_end
@@ -285,7 +291,7 @@ class SyncRB():
 if __name__ == '__main__':
     sync = SyncRB(secrets_file=SECRETS_FILE,
                   config_file=CONFIG_FILE)
-    sync.load_librefm_network()
+    sync.load_lastfm_network()
 
     recents = sync.get_recent_tracks()
     if sync.match_scrobbles(recents) > 0:
