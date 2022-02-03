@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-Copyright 2017-2020 Keith Miyake
+Copyright 2017-2022 Keith Miyake
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -27,11 +27,12 @@ import configparser
 import logging
 
 # Change the following paths as appropriate on your system
-PYLAST_CONFIG_DIR = os.path.join(os.path.expanduser('~'), '.config', 'pylast')
+CONFIG_DIR = './'
+# default rhythmbox database location:
 RHYTHMBOX_DB = os.path.expanduser('~/.local/share/rhythmbox/rhythmdb.xml')
-CONFIG_FILE = os.path.join(PYLAST_CONFIG_DIR, 'rbsync.cfg')
-SECRETS_FILE = os.path.join(PYLAST_CONFIG_DIR, 'secrets.yaml')
-# LIBREFM_SESSION_KEY_FILE = os.path.join(PYLAST_CONFIG_DIR, "session_key.librefm")
+CONFIG_FILE = os.path.join(CONFIG_DIR, 'rbsync.cfg')
+SECRETS_FILE = os.path.join(CONFIG_DIR, 'secrets.yaml')
+# LIBREFM_SESSION_KEY_FILE = os.path.join(CONFIG_DIR, 'session_key.librefm')
 
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.INFO)
 
@@ -63,7 +64,7 @@ class SyncRB():
     def load_secrets(self, secrets_file):
         if os.path.isfile(secrets_file):
             import yaml
-            with open(secrets_file, 'r') as f:  # see example_test_pylast.yaml
+            with open(secrets_file, 'r') as f:
                 self.secrets = yaml.load(f, Loader=yaml.SafeLoader)
                 if not self.secrets:
                     logging.warning('secrets.yaml could not be loaded; creating new file.')
@@ -75,7 +76,7 @@ class SyncRB():
             self.create_secrets(secrets_file)
 
     def create_secrets(self, secrets_file):
-        import yaml  # pip install pyyaml
+        import yaml
         from getpass import getpass
         self.secrets = {}
         try:
@@ -102,6 +103,8 @@ class SyncRB():
                 if 'last_update' in config['Sync'] else '0'
             self.config['limit'] = config['Sync']['limit'] \
                 if 'limit' in config['Sync'] else '500'
+            self.config['backup'] = config['Sync'].getboolean('backup') \
+                if 'backup' in config['Sync'] else True
             if database_file is not None:
                 self.config['rhythmdb'] = config['Sync']['rhythmdb'] \
                     if 'rhythmdb' in config['Sync'] \
@@ -112,6 +115,7 @@ class SyncRB():
             self.config['last_update'] = '0'
             self.config['limit'] = '500'
             self.config['rhythmdb'] = RHYTHMBOX_DB
+            self.config['backup'] = True
         logging.info('Last successful sync was {0}'.format(
               self.local_timestamp(self.config['last_update'])))
 
@@ -119,6 +123,7 @@ class SyncRB():
         if self.config is not None:
             config = configparser.ConfigParser()
             config['Sync'] = {}
+            config['Sync']['backup'] = str(self.config['backup'])
             config['Sync']['last_update'] = str(int(datetime.timestamp(datetime.now())))
             config['Sync']['limit'] = self.config['limit']
             config['Sync']['rhythmdb'] = self.config['rhythmdb']
@@ -186,7 +191,6 @@ class SyncRB():
                 logging.debug(
                     'Pulling tracks starting at {0} and ending at {1} ({2} - {3})'
                     .format(
-                            # limit,
                             datetime.fromtimestamp(time_start),
                             datetime.fromtimestamp(time_end),
                             time_start,
@@ -195,7 +199,6 @@ class SyncRB():
                 )
                 recents = self.network.get_user(
                     self.secrets['last_username']).get_recent_tracks(
-                        # limit=limit,
                         time_from=time_start,
                         time_to=time_end
                     )
@@ -222,25 +225,26 @@ class SyncRB():
         return all_recents
 
     def xpath_escape(self, s):
-        # x = escape(s)
-        x = s.replace('"', '&quot;')
-        return x
+        # make sure that " and ' are properly matched since xpath is wonko
+        # https://www.examplefiles.net/cs/234056
+        if '"' in s and "'" in s:
+            return 'concat(%s)' % ", '""',".join('"%s"' % x for x in s.split('"'))
+        elif '"' in s:
+            return "'%s'" % s
+        return '"%s"' % s
 
     def xpath_matches(self, artist, title, album):
         xp_query = '//entry[@type=\"song\"]'
         if title is not None:
-            xp_query += '/title[lower(text())=\"%s\"]/..' % \
-                    self.xpath_escape(title.lower())
+            xp_query += '/title[lower(text())=' + self.xpath_escape(title.lower()) + ']/..'
         if artist is not None:
-            xp_query += '/artist[lower(text())=\"%s\"]/..' % \
-                    self.xpath_escape(artist.lower())
-        if album is not None and album != 'music':  # 'music' == empty
-            xp_query += '/album[lower(text())=\"%s\"]/..' % \
-                    self.xpath_escape(album.lower())
+            xp_query += '/artist[lower(text())=' + self.xpath_escape(artist.lower()) + ']/..'
+        if album is not None and album != 'music' and album != '[unknown album]':  # 'music' == empty
+            xp_query += '/album[lower(text())=' + self.xpath_escape(album.lower()) + ']/..'
+        logging.debug('\n->Query: ' + xp_query)
         matches = self.db_root.xpath(
             xp_query,
             extensions={(None, 'lower'): (lambda c, a: a[0].lower())})
-        logging.debug('\n->Query: ' + xp_query)
         return matches
 
     def match_scrobbles(self, tracklist):
@@ -283,7 +287,8 @@ class SyncRB():
         return num_matches
 
     def write_db(self):
-        rhythmdb_backup = self.config['rhythmdb'] + '.backup-' + self.config['last_update']
+        if self.config['backup']:
+            rhythmdb_backup = self.config['rhythmdb'] + '.backup-' + self.config['last_update']
         shutil.copy2(self.config['rhythmdb'], rhythmdb_backup)
         self.db.write(self.config['rhythmdb'])
 
