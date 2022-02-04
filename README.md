@@ -33,7 +33,7 @@ It works by connecting to the LastFM api and pulling your recently scrobbled son
 
 ## To-Do/known bugs
 
-- [.] Some files don't sync correctly. It has something to do with the format of artist/title/album but needs to be confirmed across a broader test set.
+- [X] Some files don't sync correctly. It has something to do with the format of artist/title/album but needs to be confirmed across a broader test set.
   - [x] items without an album or "[unknown album]" [seems to be fixed]
   - [x] albums with quotes or apostrophes (e.g., 7", what's going on; one or the other works but not both at the same time) [seems to be fixed]
 - [ ] Change config and secrets files to XML to reduce dependencies; can't remember why I did it the way I did, but that was not a clever design choice.
