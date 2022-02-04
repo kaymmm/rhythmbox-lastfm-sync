@@ -18,14 +18,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 
+import configparser
+from datetime import datetime
+import inspect
+import logging
+from lxml import etree
+import os
 import pylast
 import shutil
-import os
-from datetime import datetime
-from lxml import etree
-import configparser
-import logging
-import inspect
+import yaml
 
 # Change the following paths as appropriate on your system
 # CONFIG_DIR = script directory
@@ -66,7 +67,6 @@ class SyncRB():
 
     def load_secrets(self, secrets_file):
         if os.path.isfile(secrets_file):
-            import yaml
             with open(secrets_file, 'r') as f:
                 self.secrets = yaml.load(f, Loader=yaml.SafeLoader)
                 if not self.secrets:
@@ -79,7 +79,6 @@ class SyncRB():
             self.create_secrets(secrets_file)
 
     def create_secrets(self, secrets_file):
-        import yaml
         from getpass import getpass
         self.secrets = {}
         try:
@@ -227,27 +226,26 @@ class SyncRB():
             )
         return all_recents
 
-    def xpath_escape(self, s):
-        # make sure that " and ' are properly matched since xpath is wonko
-        # https://www.examplefiles.net/cs/234056
-        if '"' in s and "'" in s:
-            return 'concat(%s)' % ", '""',".join('"%s"' % x for x in s.split('"'))
-        elif '"' in s:
-            return "'%s'" % s
-        return '"%s"' % s
-
     def xpath_matches(self, artist, title, album):
         xp_query = '//entry[@type=\"song\"]'
         if title is not None:
-            xp_query += '/title[lower(text())=' + self.xpath_escape(title.lower()) + ']/..'
+            xp_query += '/title[lower(text())=$title]/..'
         if artist is not None:
-            xp_query += '/artist[lower(text())=' + self.xpath_escape(artist.lower()) + ']/..'
+            xp_query += '/artist[lower(text())=$artist]/..'
         if album is not None and album != 'music' and album != '[unknown album]':  # 'music' == empty
-            xp_query += '/album[lower(text())=' + self.xpath_escape(album.lower()) + ']/..'
-        logging.debug('\n->Query: ' + xp_query)
-        matches = self.db_root.xpath(
-            xp_query,
-            extensions={(None, 'lower'): (lambda c, a: a[0].lower())})
+            xp_query += '/album[lower(text())=$album]/..'
+            matches = self.db_root.xpath(
+                xp_query,
+                title = title.lower(),
+                artist = artist.lower(),
+                album = album.lower(),
+                extensions={(None, 'lower'): (lambda c, a: a[0].lower())})
+        else:
+            matches = self.db_root.xpath(
+                xp_query,
+                title = title.lower(),
+                artist = artist.lower(),
+                extensions={(None, 'lower'): (lambda c, a: a[0].lower())})
         return matches
 
     def match_scrobbles(self, tracklist):
