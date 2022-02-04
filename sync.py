@@ -25,9 +25,12 @@ from datetime import datetime
 from lxml import etree
 import configparser
 import logging
+import inspect
 
 # Change the following paths as appropriate on your system
-CONFIG_DIR = './'
+# CONFIG_DIR = script directory
+filename = inspect.getframeinfo(inspect.currentframe()).filename
+CONFIG_DIR = os.path.dirname(os.path.abspath(filename))
 # default rhythmbox database location:
 RHYTHMBOX_DB = os.path.expanduser('~/.local/share/rhythmbox/rhythmdb.xml')
 CONFIG_FILE = os.path.join(CONFIG_DIR, 'rbsync.cfg')
