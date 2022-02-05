@@ -1,4 +1,6 @@
-# Rhythmbox Sync from LastFM (easily tweaked for LibreFM etc.)
+# Rhythmbox Sync from LastFM
+
+**Note:** it's easily tweaked for LibreFM etc.
 
 This is project developed for myself to pull external scrobbles to LastFM into the Rhythmbox playcount. If anyone else finds it useful they're welcome to try it out.
 
@@ -63,6 +65,16 @@ To convert:
 - [X] Move config directories to a more sensible location
 - [ ] Code cleanup
 - [X] Create this readme
+
+## Version History
+
+v2.0.0: (breaking changes) Overhaul the configuration file setup and fix album matching
+
+v1.1.1: update dependencies
+
+v1.1.0: (breaking changes) Add configuration file
+
+v0.1.0: Initial commit
 
 ## LICENSE
 

@@ -18,6 +18,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 
+# Rhythmbox Library Sync w/LastFM
+# v2.0.0
+# 2022-02-04
+
 from datetime import datetime
 import inspect
 from getpass import getpass
