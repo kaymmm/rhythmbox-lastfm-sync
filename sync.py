@@ -295,13 +295,15 @@ class SyncRB():
         shutil.copy2(self.config['rhythmdb'], rhythmdb_backup)
         self.db.write(self.config['rhythmdb'])
 
-
-if __name__ == '__main__':
-    sync = SyncRB(secrets_file=SECRETS_FILE,
-                  config_file=CONFIG_FILE)
+def sync_lastfm(secrets_file=SECRETS_FILE,
+                config_file=CONFIG_FILE):
+    sync = SyncRB(secrets_file,config_file)
     sync.load_lastfm_network()
-
     recents = sync.get_recent_tracks()
     if sync.match_scrobbles(recents) > 0:
         sync.write_db()
     sync.save_config(CONFIG_FILE)
+
+
+if __name__ == '__main__':
+    sync_lastfm()
