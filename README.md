@@ -29,7 +29,15 @@ It works by connecting to the LastFM api and pulling your recently scrobbled son
 12. while it's running, it should output what's going on as it syncs files, along with a check/'x' corresponding to the sync status. 'x' usually means that for whatever reason, the artist/title wasn't found in your library.
 13. after running, it should create a `secrets.yaml` file adjacent to `rbsync.yaml`. don't share or git-sync this since it'll store your LastFM api key and password hash (rainbow table attacks?)
 14. if you said yes to backup, it'll create a `rhythmdb.xml.backup-(date)` file adjacent to your original rhythmdb.xml file. **Note**: it won't clean old versions, so if you run it often, you'll spam backup files that can get quite large. suggest cleaning out old backups periodically.
-15. if you don't want all the info output, edit `sync.py` l37 and change `logging.INFO` to something else, probably `logging.WARNING` so you'll still see actual warnings or errors.
+15. if you don't want all the info output, edit `sync.py` around l40 and change `logging.INFO` to something else, probably `logging.WARNING` so you'll still see actual warnings or errors.
+
+## Usage
+
+Set up the configuration file `rbsync.yaml` as described above.
+
+Run `sync.py` from the command line however you're most comfortable running python scripts.
+
+For example: `> ./sync.py` (assuming it's been chmodded to execute)
 
 ## Breaking Change
 

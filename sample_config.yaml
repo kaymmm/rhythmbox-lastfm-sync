@@ -1,3 +1,4 @@
+backup: true
 last_update: 0
 limit: 500
 rhythmdb: '~/.local/share/rhythmbox/rhythmdb.xml'
