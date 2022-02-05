@@ -18,25 +18,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 
-import configparser
 from datetime import datetime
 import inspect
+from getpass import getpass
 import logging
 from lxml import etree
 import os
 import pylast
 import shutil
+import time
+import tzlocal
+import webbrowser
 import yaml
 
 # Change the following paths as appropriate on your system
-# CONFIG_DIR = script directory
+# Get the script directory
 filename = inspect.getframeinfo(inspect.currentframe()).filename
-CONFIG_DIR = os.path.dirname(os.path.abspath(filename))
+SCRIPT_DIR = os.path.dirname(os.path.abspath(filename))
 # default rhythmbox database location:
 RHYTHMBOX_DB = os.path.expanduser('~/.local/share/rhythmbox/rhythmdb.xml')
-CONFIG_FILE = os.path.join(CONFIG_DIR, 'rbsync.cfg')
-SECRETS_FILE = os.path.join(CONFIG_DIR, 'secrets.yaml')
-# LIBREFM_SESSION_KEY_FILE = os.path.join(CONFIG_DIR, 'session_key.librefm')
+CONFIG_FILE = os.path.join(SCRIPT_DIR, 'rbsync.yaml')
+SECRETS_FILE = os.path.join(SCRIPT_DIR, 'secrets.yaml')
+# LIBREFM_SESSION_KEY_FILE = os.path.join(SCRIPT_DIR, 'session_key.librefm')
 
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.INFO)
 
@@ -47,20 +50,19 @@ class SyncRB():
 
     def __init__(self,
                  secrets_file=SECRETS_FILE,
-                 config_file=CONFIG_FILE,
-                 database_file=RHYTHMBOX_DB):
+                 config_file=CONFIG_FILE
+                 ):
         if self.secrets is None:
             self.load_secrets(secrets_file)
 
         if self.config is None:
-            self.load_config(config_file, database_file)
+            self.load_config(config_file)
 
         if os.path.isfile(self.config['rhythmdb']):
             self.db = etree.parse(self.config['rhythmdb'])
             self.db_root = self.db.getroot()
 
     def local_timestamp(self, strtimestamp):
-        import tzlocal
         return datetime.fromtimestamp(
                 float(strtimestamp),
                 tzlocal.get_localzone()).strftime('%Y-%m-%d %H:%M:%S (%Z)')
@@ -79,7 +81,6 @@ class SyncRB():
             self.create_secrets(secrets_file)
 
     def create_secrets(self, secrets_file):
-        from getpass import getpass
         self.secrets = {}
         try:
             self.secrets['last_username'] = \
@@ -95,43 +96,41 @@ class SyncRB():
             logging.debug('Saved secrets to secrets.yaml')
         except Exception as err:
             logging.error('There was an error saving the secrets: {0}'.format(err))
+            sys.exit('Fatal error. Cannot continue.')
 
-    def load_config(self, config_file, database_file):
-        config = configparser.ConfigParser()
-        self.config = {}
-        if os.path.isfile(config_file):
-            config.read_file(open(config_file))
-            self.config['last_update'] = config['Sync']['last_update'] \
-                if 'last_update' in config['Sync'] else '0'
-            self.config['limit'] = config['Sync']['limit'] \
-                if 'limit' in config['Sync'] else '500'
-            self.config['backup'] = config['Sync'].getboolean('backup') \
-                if 'backup' in config['Sync'] else True
-            if database_file is not None:
-                self.config['rhythmdb'] = config['Sync']['rhythmdb'] \
-                    if 'rhythmdb' in config['Sync'] \
-                    else database_file
+    def load_config(self, config_file):
+        try:
+            if os.path.isfile(config_file):
+                with open(config_file, 'r') as f:
+                    logging.debug('Configuration file opened: ' + config_file)
+                    self.config = yaml.load(f, Loader=yaml.SafeLoader)
             else:
-                self.config['rhythmdb'] = RHYTHMBOX_DB
+                logging.error('The configuration file does not exist at ' + config_file)
+            logging.info('Last successful sync was {0}'.format(
+                self.local_timestamp(self.config['last_update'])))
+        except Exception as err:
+            logging.error('There was an error loading the configuration file: {0}'.format(err))
+            sys.exit('Fatal error. Exiting.')
+        if not self.config:
+            logging.error('Configuration not parsed correctly')
+            sys.exit('Fatal error. Exiting.')
         else:
-            self.config['last_update'] = '0'
-            self.config['limit'] = '500'
-            self.config['rhythmdb'] = RHYTHMBOX_DB
-            self.config['backup'] = True
-        logging.info('Last successful sync was {0}'.format(
-              self.local_timestamp(self.config['last_update'])))
+            logging.debug('Configuration file parsed.')
+            if 'rhythmdb' in self.config:
+                self.config['rhythmdb'] = os.path.expanduser(self.config['rhythmdb'])
+            else:
+                self.config['rhythmdb'] = RHYTHMDB
+        logging.debug('Configuration:')
+        logging.debug(self.config)
 
     def save_config(self, config_file):
-        if self.config is not None:
-            config = configparser.ConfigParser()
-            config['Sync'] = {}
-            config['Sync']['backup'] = str(self.config['backup'])
-            config['Sync']['last_update'] = str(int(datetime.timestamp(datetime.now())))
-            config['Sync']['limit'] = self.config['limit']
-            config['Sync']['rhythmdb'] = self.config['rhythmdb']
-            with open(config_file, 'w') as configfile:
-                config.write(configfile)
-            logging.debug('Updated configuration file')
+        try:
+            with open(config_file, 'w+') as f:
+                self.config['last_update'] = str(int(datetime.timestamp(datetime.now())))
+                yaml.dump(self.config, f, default_flow_style = False)
+        except Exception as err:
+            logging.error('There was an error saving the configuration file: {0}'.format(err))
+        logging.debug('Updated configuration file.')
 
     def load_lastfm_network(self):
         try:
@@ -145,7 +144,7 @@ class SyncRB():
             return 1
         except (pylast.NetworkError, pylast.MalformedResponseError) as e:
             logging.error('Could not connect to last.fm: {0}'.format(e))
-            return 0
+            sys.exit('Fatal Error. Cannot conect to last.fm')
 
     def last_session(self, key_file):
         if not os.path.exists(key_file):
@@ -155,7 +154,6 @@ class SyncRB():
             print(
                 "Please authorize the scrobbler "
                 "to scrobble to your account: %s\n" % url)
-            import webbrowser
             webbrowser.open(url)
 
             while True:
@@ -166,7 +164,6 @@ class SyncRB():
                     fp.close()
                     break
                 except pylast.WSError:
-                    import time
                     time.sleep(1)
         else:
             session_key = open(key_file).read()
