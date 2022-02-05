@@ -120,7 +120,7 @@ class SyncRB():
             if 'rhythmdb' in self.config:
                 self.config['rhythmdb'] = os.path.expanduser(self.config['rhythmdb'])
             else:
-                self.config['rhythmdb'] = RHYTHMDB
+                self.config['rhythmdb'] = RHYTHMBOX_DB
         logging.debug('Configuration:')
         logging.debug(self.config)
 
