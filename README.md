@@ -12,9 +12,9 @@ It works by connecting to the LastFM api and pulling your recently scrobbled son
 2. Requires python3. Not sure what version exactly, but you need a version with configparser built in (or to install it through pip)
 3. `git clone` the repo; `cd` to the repo directory.
 4. `pip install -r requirements.txt`
-5. create `rbsync.cfg`; you can use `sample_config.cfg` as a template (e.g., `cp sample_config.cfg rbsync.cfg`)
+5. create `rbsync.yaml`; you can use `sample_config.yaml` as a template (e.g., `cp sample_config.yaml rbsync.yaml`)
 6. locate your `rhythmdb.xml` database file, probably in `~/.local/share/rhythmbox/rhythmdb.xml`
-7. edit `rbsync.cfg` (or you can use the default values):
+7. edit `rbsync.yaml` (or you can use the default values):
   a. backup: boolean whether to backup the rhythmbox database file before editing it
   b. limit: maximum number of items to pull from LastFM
   c. rhythmdb: the path you located in step (4)
@@ -27,16 +27,30 @@ It works by connecting to the LastFM api and pulling your recently scrobbled son
 10. make sure that `sync.py` is executable: `> chmod u+x sync.py`
 11. run it! e.g., `> ./sync.py`; you probably want to quit Rhythmbox before you sync so that your changes register correctly. though it might update automatically?
 12. while it's running, it should output what's going on as it syncs files, along with a check/'x' corresponding to the sync status. 'x' usually means that for whatever reason, the artist/title wasn't found in your library.
-13. after running, it should create a `secrets.yaml` file adjacent to `rbsync.cfg`. don't share or git-sync this since it'll store your LastFM api key and password hash (rainbow table attacks?)
+13. after running, it should create a `secrets.yaml` file adjacent to `rbsync.yaml`. don't share or git-sync this since it'll store your LastFM api key and password hash (rainbow table attacks?)
 14. if you said yes to backup, it'll create a `rhythmdb.xml.backup-(date)` file adjacent to your original rhythmdb.xml file. **Note**: it won't clean old versions, so if you run it often, you'll spam backup files that can get quite large. suggest cleaning out old backups periodically.
 15. if you don't want all the info output, edit `sync.py` l37 and change `logging.INFO` to something else, probably `logging.WARNING` so you'll still see actual warnings or errors.
+
+## Breaking Change
+
+### Converted rbsync.cfg to rbsync.yaml
+
+This was to get rid of a dependency and streamline everything about the configuration file.
+
+To convert:
+
+1. edit `rbsync.cfg`
+2. convert every `key = val` to `key: val`
+3. get rid of the '[Sync]' at the top
+4. save as `rbsync.yaml`
+5. that's it.
 
 ## To-Do/known bugs
 
 - [X] Some files don't sync correctly. It has something to do with the format of artist/title/album but needs to be confirmed across a broader test set.
   - [x] items without an album or "[unknown album]" [seems to be fixed]
   - [x] albums with quotes or apostrophes (e.g., 7", what's going on; one or the other works but not both at the same time) [seems to be fixed]
-- [ ] Change config and secrets files to XML to reduce dependencies; can't remember why I did it the way I did, but that was not a clever design choice.
+- [X] Change config and secrets files to XML to reduce dependencies; can't remember why I did it the way I did, but that was not a clever design choice. **Note:** BREAKING CHANGE - must convert your rbsync.cfg to yaml format (see above)
 - [ ] update the test suite and actually complete it
 - [X] Move config directories to a more sensible location
 - [ ] Code cleanup
