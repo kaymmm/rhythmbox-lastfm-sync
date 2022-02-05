@@ -113,6 +113,7 @@ class SyncRB():
             sys.exit('Fatal error. Exiting.')
         if not self.config:
             logging.error('Configuration not parsed correctly')
+            logging.error('  make sure you have a "rbsync.yaml" file configured.')
             sys.exit('Fatal error. Exiting.')
         else:
             logging.debug('Configuration file parsed.')
