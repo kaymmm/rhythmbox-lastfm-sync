@@ -282,10 +282,9 @@ class SyncRB():
                     matches[0].append(el_temp)
                 num_matches += 1
                 logging.info('\033[92m' + '✓ ' + '\033[00m' + track['artist']
-                      + ' - ' + track['album'] + ' - ' + track['title']
-                      +  playcount + '}}' + ' [Played: '
-                      + self.local_timestamp(track['timestamp'])
-                      + '(' + playcount + ')]')
+                    + ' - ' + track['album'] + ' - ' + track['title']
+                    + ' [Played (' + playcount + '): '
+                    + self.local_timestamp(track['timestamp']) + ']')
             else:
                 logging.info('\033[91m' + 'x ' + '\033[00m' + track['artist'] + ' - '
                       + track['album'] + ' - ' + track['title']
